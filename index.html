@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Sala de Control Horómetros</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Paleta de marca (deck maestro):
+     Naranjo 166C #E55302 · Dorado 130C #F4AA00 · Turquesa 320C #0098AA
+     Rojo 180C #C13832 · Burdeo 188C #7A2531 · Pizarra 432C #36424A · Arena 453C #C4C1A0 */
+  :root{
+    color-scheme: light;
+    --page:#f6f4ef;
+    --surface:#ffffff;
+    --surface-2:#efece1;
+    --ink:#36424A;
+    --ink-2:#5c6971;
+    --ink-3:#8b959b;
+    --border:rgba(54,66,74,0.14);
+    --border-strong:rgba(54,66,74,0.24);
+    --accent:#E55302;
+    --accent-text:#C24500;
+    --accent-ink:#ffffff;
+    --accent-wash:rgba(229,83,2,0.10);
+    --good:#0098AA;
+    --good-text:#00707d;
+    --good-wash:rgba(0,152,170,0.12);
+    --warning:#F4AA00;
+    --warning-text:#9C6A00;
+    --warning-wash:rgba(244,170,0,0.20);
+    --critical:#C13832;
+    --critical-wash:rgba(193,56,50,0.11);
+    --secondary:#7A2531;
+    --arena:#C4C1A0;
+    --shadow: 0 1px 2px rgba(54,66,74,0.07), 0 8px 24px -12px rgba(54,66,74,0.22);
+    --font-display: "Big Shoulders Display", "Arial Narrow", sans-serif;
+    --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --page:#14181a;
+      --surface:#1d2326;
+      --surface-2:#262c2c;
+      --ink:#eef1f0;
+      --ink-2:#b9c1c2;
+      --ink-3:#828d8f;
+      --border:rgba(255,255,255,0.09);
+      --border-strong:rgba(255,255,255,0.17);
+      --accent:#F2712F;
+      --accent-text:#F2712F;
+      --accent-ink:#20100a;
+      --accent-wash:rgba(242,113,47,0.16);
+      --good:#2FBBCD;
+      --good-text:#2FBBCD;
+      --good-wash:rgba(47,187,205,0.16);
+      --warning:#F4AA00;
+      --warning-text:#F4AA00;
+      --warning-wash:rgba(244,170,0,0.18);
+      --critical:#E2564F;
+      --critical-wash:rgba(226,86,79,0.16);
+      --secondary:#A85261;
+      --arena:#8d8a71;
+      --shadow: 0 1px 0 rgba(0,0,0,0.4), 0 12px 28px -14px rgba(0,0,0,0.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --page:#14181a;
+    --surface:#1d2326;
+    --surface-2:#262c2c;
+    --ink:#eef1f0;
+    --ink-2:#b9c1c2;
+    --ink-3:#828d8f;
+    --border:rgba(255,255,255,0.09);
+    --border-strong:rgba(255,255,255,0.17);
+    --accent:#F2712F;
+    --accent-text:#F2712F;
+    --accent-ink:#20100a;
+    --accent-wash:rgba(242,113,47,0.16);
+    --good:#2FBBCD;
+    --good-text:#2FBBCD;
+    --good-wash:rgba(47,187,205,0.16);
+    --warning:#F4AA00;
+    --warning-text:#F4AA00;
+    --warning-wash:rgba(244,170,0,0.18);
+    --critical:#E2564F;
+    --critical-wash:rgba(226,86,79,0.16);
+    --secondary:#A85261;
+    --arena:#8d8a71;
+    --shadow: 0 1px 0 rgba(0,0,0,0.4), 0 12px 28px -14px rgba(0,0,0,0.6);
+  }
+
+  *{box-sizing:border-box;}
+  .title-strip{height:6px; background:var(--accent);}
+  body{
+    margin:0; background:var(--page); color:var(--ink);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:var(--font-display); text-wrap:balance; margin:0; letter-spacing:0.01em;}
+  .num{font-family:var(--font-mono); font-variant-numeric: tabular-nums;}
+
+  .wrap{max-width:1240px; margin:0 auto; padding:20px 24px 56px;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
+    flex-wrap:wrap; padding-bottom:18px; margin-bottom:18px;
+    border-bottom:1px solid var(--border);
+  }
+  .brand-eyebrow{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--accent-text); margin:0 0 6px;
+  }
+  .brand h1{font-size:clamp(28px,4vw,40px); font-weight:800; line-height:1;}
+  .brand p{margin:6px 0 0; color:var(--ink-2); font-size:14px;}
+  .updated{
+    font-family:var(--font-mono); font-size:12px; color:var(--ink-3); text-align:right;
+  }
+  .updated b{color:var(--ink-2); font-weight:600;}
+
+  /* ---------- KPI strip ---------- */
+  .kpis{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px;
+  }
+  .kpi{
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px; box-shadow:var(--shadow);
+  }
+  .kpi .label{font-size:11px; text-transform:uppercase; letter-spacing:0.09em; color:var(--ink-3); font-weight:600;}
+  .kpi .value{font-family:var(--font-display); font-size:32px; font-weight:700; line-height:1.15; margin-top:4px;}
+  .kpi .sub{font-size:12px; color:var(--ink-2); margin-top:2px;}
+  .kpi.accentline{border-top:3px solid var(--accent);}
+  .kpi.goodline{border-top:3px solid var(--good);}
+  .kpi.warnline{border-top:3px solid var(--warning);}
+  .kpi.critline{border-top:3px solid var(--critical);}
+
+  /* ---------- Section heading ---------- */
+  .section-head{display:flex; align-items:baseline; justify-content:space-between; margin:34px 0 12px;}
+  .section-head h2{font-size:22px; font-weight:700; border-left:4px solid var(--accent); padding-left:10px;}
+  .section-head .count{font-family:var(--font-mono); font-size:12px; color:var(--ink-3);}
+
+  /* ---------- Hoja panels ---------- */
+  .panels{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
+  .panel{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    box-shadow:var(--shadow); display:flex; flex-direction:column; overflow:hidden;
+  }
+  .panel-head{padding:16px 18px 12px; display:flex; align-items:center; gap:14px; border-bottom:1px solid var(--border);}
+  .ring{width:56px; height:56px; border-radius:50%; flex:none; position:relative;
+        background: conic-gradient(var(--good) calc(var(--pct)*1%), var(--critical) 0);}
+  .ring::after{content:""; position:absolute; inset:7px; border-radius:50%; background:var(--surface);}
+  .ring span{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+             font-family:var(--font-mono); font-size:12px; font-weight:600; z-index:1;}
+  .panel-title{flex:1;}
+  .panel-title h3{font-size:18px; font-weight:700;}
+  .panel-title .meta{font-size:12px; color:var(--ink-2); margin-top:2px; font-family:var(--font-mono);}
+  .legend-mini{display:flex; gap:10px; font-size:11px; color:var(--ink-2); margin-top:6px;}
+  .legend-mini span{display:inline-flex; align-items:center; gap:4px;}
+  .dot{width:7px; height:7px; border-radius:50%; display:inline-block;}
+
+  .panel{position:relative;}
+  .rows-fade{position:absolute; left:0; right:0; bottom:0; height:26px; background:linear-gradient(to bottom, transparent, var(--surface)); pointer-events:none; border-radius:0 0 12px 12px;}
+  .rows{overflow-y:auto; max-height:420px; scrollbar-width:thin;}
+  .rows::-webkit-scrollbar{width:6px;}
+  .rows::-webkit-scrollbar-thumb{background:var(--border-strong); border-radius:3px;}
+  .row{
+    display:grid; grid-template-columns: 1fr 74px 22px; align-items:center; gap:10px;
+    padding:8px 18px; border-bottom:1px solid var(--border); font-size:12.5px;
+  }
+  .row:last-child{border-bottom:none;}
+  .row .name{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .row .name b{font-weight:600;}
+  .row .name .model{color:var(--ink-3); font-family:var(--font-mono); font-size:11px;}
+  .bar{height:8px; border-radius:3px; background:var(--arena); overflow:hidden; display:flex; border:1px solid var(--border);}
+  .bar .seg-func{background:var(--good); border-right:1px solid var(--surface);}
+  .bar .seg-det{background:var(--secondary);}
+  .chip{width:9px; height:9px; border-radius:50%; justify-self:center;}
+  .chip.OPERANDO{background:var(--good);}
+  .chip.DETENIDA{background:var(--critical);}
+  .chip.LISTO{background:var(--warning);}
+  .chip.SINDATO{background:var(--ink-3); opacity:.4;}
+
+  /* ---------- Two-column lower section ---------- */
+  .lower{display:grid; grid-template-columns: 1.15fr 1fr; gap:16px; align-items:start;}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); overflow:hidden;}
+  .card-head{padding:16px 18px; border-bottom:1px solid var(--border);}
+  .card-head h3{font-size:17px; font-weight:700;}
+  .card-head p{margin:4px 0 0; font-size:12.5px; color:var(--ink-2);}
+
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  thead th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--ink-3); font-weight:600; padding:8px 18px; border-bottom:1px solid var(--border);
+    background:var(--surface-2);
+  }
+  tbody td{padding:9px 18px; border-bottom:1px solid var(--border); vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover td{background:var(--surface-2);}
+  .tbl-wrap{overflow-x:auto;}
+  .hoja-tag{font-size:10.5px; color:var(--ink-3); font-family:var(--font-mono);}
+  .status-pill{
+    display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:99px;
+    font-size:11px; font-weight:600; font-family:var(--font-mono);
+  }
+  .status-pill.PROGRAMAR{background:var(--warning-wash); color:var(--warning-text);}
+  .status-pill.OK{background:var(--surface-2); color:var(--ink-3);}
+  .status-pill.OPERANDO{background:var(--good-wash); color:var(--good-text);}
+  .status-pill.DETENIDA{background:var(--critical-wash); color:var(--critical);}
+  .status-pill.LISTO{background:var(--warning-wash); color:var(--warning-text);}
+  .status-pill.SINDATO{background:var(--surface-2); color:var(--ink-3);}
+  .restante-neg{color:var(--critical); font-weight:700;}
+  .restante-low{color:var(--warning-text); font-weight:700;}
+
+  .timeline{list-style:none; margin:0; padding:6px 0;}
+  .timeline li{
+    display:grid; grid-template-columns: 92px 1fr auto; gap:12px; align-items:center;
+    padding:9px 18px; border-bottom:1px solid var(--border); font-size:12.5px;
+  }
+  .timeline li:last-child{border-bottom:none;}
+  .timeline .date{font-family:var(--font-mono); font-weight:600; color:var(--ink); font-size:12px; white-space:nowrap;}
+  .timeline .date small{display:block; color:var(--ink-3); font-weight:400; font-size:10.5px;}
+  .timeline .desc b{font-weight:600;}
+  .timeline .desc .hoja-tag{display:block;}
+
+  .callout{
+    margin:0 0 24px; padding:12px 16px; border-radius:10px; background:var(--warning-wash);
+    border:1px solid var(--border); font-size:12.5px; color:var(--ink-2);
+  }
+  .callout b{color:var(--ink);}
+
+  footer{margin-top:36px; padding-top:16px; border-top:1px solid var(--border); font-size:12px; color:var(--ink-3); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;}
+  footer b{color:var(--ink-2);}
+
+  /* ---------- Pestañas ---------- */
+  .tabs{display:flex; gap:4px; margin:0 0 18px; border-bottom:1px solid var(--border); overflow-x:auto;}
+  .tab{
+    font:inherit; font-size:13.5px; font-weight:600; color:var(--ink-2); background:none; border:0;
+    padding:10px 16px; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-1px; white-space:nowrap;
+    display:inline-flex; align-items:center; gap:8px;
+  }
+  .tab:hover{color:var(--ink);}
+  .tab[aria-selected="true"]{color:var(--accent-text); border-bottom-color:var(--accent);}
+  .tab .badge{font-family:var(--font-mono); font-size:11px; background:var(--warning); color:#2b1d00; border-radius:99px; padding:1px 7px;}
+
+  /* ---------- Alerta PROGRAMAR ---------- */
+  .alerta{
+    border:1px solid rgba(244,170,0,0.55); border-left:6px solid var(--warning); background:var(--warning-wash);
+    border-radius:12px; padding:14px 18px; margin:0 0 22px;
+  }
+  .alerta-head{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px;}
+  .alerta-head h2{font-size:20px; font-weight:800; display:flex; align-items:center; gap:10px;}
+  .alerta-head h2 .icon{width:26px; height:26px; border-radius:50%; background:var(--warning); color:#2b1d00; display:inline-flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:15px; font-weight:700;}
+  .alerta-head p{margin:0; font-size:12.5px; color:var(--ink-2);}
+  .alerta-list{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px;}
+  .alerta-item{
+    background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px;
+    display:flex; flex-direction:column; gap:3px; cursor:pointer; text-align:left; font:inherit; color:inherit;
+  }
+  .alerta-item:hover{border-color:var(--warning);}
+  .alerta-item .top{display:flex; justify-content:space-between; align-items:center; gap:8px;}
+  .alerta-item b{font-size:13.5px;}
+  .alerta-item .linea{font-size:10.5px; color:var(--ink-3); font-family:var(--font-mono);}
+  .alerta-item .nums{font-family:var(--font-mono); font-size:12px; color:var(--ink-2);}
+  .alerta-item .nums .vencido{color:var(--critical); font-weight:700;}
+
+  /* ---------- Planilla ---------- */
+  .filtros{display:flex; gap:8px; flex-wrap:wrap; margin:0 0 14px; align-items:center;}
+  .filtro{
+    font:inherit; font-size:12.5px; font-weight:600; padding:7px 14px; border-radius:99px; cursor:pointer;
+    border:1px solid var(--border-strong); background:var(--surface); color:var(--ink-2);
+  }
+  .filtro[aria-pressed="true"]{background:var(--ink); color:var(--page); border-color:var(--ink);}
+  .filtro .n{font-family:var(--font-mono); opacity:.7; margin-left:4px;}
+  .solo-prog{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-2); margin-left:auto; cursor:pointer;}
+  .planilla-wrap{overflow-x:auto;}
+  table.planilla{font-size:12px; min-width:980px;}
+  table.planilla thead th{padding:8px 6px; text-align:center; white-space:normal; line-height:1.25; vertical-align:bottom;}
+  table.planilla thead tr.grp th{background:var(--ink); color:var(--page); font-size:11px; letter-spacing:.08em; border-right:1px solid var(--surface);}
+  table.planilla tbody td{padding:7px 6px; text-align:center; white-space:nowrap; font-family:var(--font-mono);}
+  table.planilla tbody td.desc{text-align:left; font-family:var(--font-body); font-weight:600;}
+  table.planilla tbody tr.prog td{background:var(--warning-wash);}
+  table.planilla tbody tr.prog td.desc{box-shadow:inset 4px 0 0 var(--warning);}
+  table.planilla tbody tr.flash td{animation:flash 1.6s ease;}
+  @keyframes flash{0%,40%{background:rgba(244,170,0,0.55);}}
+  table.planilla td.rest-neg{color:var(--critical); font-weight:700;}
+  table.planilla td.rest-low{color:var(--warning-text); font-weight:700;}
+  table.planilla .grp-row td{background:var(--surface-2); text-align:left; font-family:var(--font-display); font-size:15px; font-weight:700; letter-spacing:.02em;}
+
+  @media (max-width: 980px){
+    .panels{grid-template-columns:1fr;}
+    .lower{grid-template-columns:1fr;}
+    .kpis{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+<div class="title-strip"></div>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <p class="brand-eyebrow">Planta de Flotación · Mantención</p>
+      <h1>Sala de Control Horómetros</h1>
+      <p>Bombas horizontales, bombas verticales y molinos — estado y horas de plan en un solo panel.</p>
+    </div>
+    <div class="updated">
+      Última lectura registrada<br><b id="lastReadOut">—</b>
+    </div>
+  </div>
+
+  <div class="alerta" id="alertaProgramar"></div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="resumen" aria-selected="true">Resumen</button>
+    <button class="tab" role="tab" data-tab="planilla" aria-selected="false">Planilla de horómetros <span class="badge" id="tabBadge"></span></button>
+  </div>
+
+  <section id="tab-resumen">
+  <div class="kpis" id="kpiStrip"></div>
+
+  <div class="section-head">
+    <h2>Equipos por línea</h2>
+    <span class="count" id="panelsCount"></span>
+    <span class="count" style="margin-left:14px; display:inline-flex; gap:12px; align-items:center;">
+      <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:10px;height:6px;border-radius:2px;background:var(--good);display:inline-block;"></span>funcionado (h)</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:10px;height:6px;border-radius:2px;background:var(--secondary);display:inline-block;"></span>detenido (h)</span>
+    </span>
+  </div>
+  <div class="panels" id="panels"></div>
+
+  <div class="section-head">
+    <h2>Atención y agenda</h2>
+    <span class="count">actualizado con cada lectura semanal</span>
+  </div>
+  <div class="lower">
+    <div class="card">
+      <div class="card-head">
+        <h3>Atención requerida</h3>
+        <p>Estado PROGRAMAR, o Restante (horas) bajo 500 — ordenado por lo más urgente primero.</p>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>Equipo</th><th>Estado</th><th>Restante&nbsp;(h)</th><th>Próx. cambio</th><th>Actual</th></tr>
+          </thead>
+          <tbody id="atrasadosBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3>Próximos 10 cambios</h3>
+        <p>Fecha de próximo cambio más cercana, todas las líneas.</p>
+      </div>
+      <ul class="timeline" id="timelineList"></ul>
+    </div>
+  </div>
+
+  <div class="section-head">
+    <h2>Cuadro general de equipos</h2>
+    <span class="count" id="cuadroCount"></span>
+  </div>
+  <div class="card">
+    <div class="card-head" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <p style="margin:0;">Horómetro, fecha de último cambio y estado de las 59 unidades — para panorama general de un vistazo.</p>
+      <input id="cuadroFiltro" type="text" placeholder="Filtrar por nombre o modelo…" style="font:inherit; font-size:12.5px; padding:7px 10px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); min-width:220px;">
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Línea</th><th>Equipo</th><th>Modelo</th><th>Última Cambio</th>
+            <th>Horómetro&nbsp;(h)</th><th>Estado</th><th>Estado Actual</th>
+          </tr>
+        </thead>
+        <tbody id="cuadroBody"></tbody>
+      </table>
+    </div>
+  </div>
+  </section>
+
+  <section id="tab-planilla" hidden>
+    <div class="filtros" id="filtros"></div>
+    <div class="card">
+      <div class="planilla-wrap">
+        <table class="planilla">
+          <thead>
+            <tr class="grp">
+              <th colspan="2">Equipo</th><th colspan="2">Periodo</th><th colspan="2">Tiempos (h)</th>
+              <th colspan="5">Fechas y Estado</th><th>Condición</th>
+            </tr>
+            <tr>
+              <th style="text-align:left">Descripción</th><th>Modelo</th><th>Última Cambio</th><th>Actual (*)</th>
+              <th>Funcionado</th><th>Detenido</th><th>Plan (horas)</th><th>Restante (horas)</th>
+              <th>Fecha Próximo Cambio</th><th>Mes de Cambio</th><th>Estado</th><th>Estado Actual</th>
+            </tr>
+          </thead>
+          <tbody id="planillaBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Datos de <b>Horometros_Bombas_Planta_Flotacion.xlsx</b> — hojas Bombas Horizontales, Bombas Verticales y Molinos.</span>
+    <span>Se actualiza cada lunes cuando se cargan las fotos de la planilla física.</span>
+  </footer>
+
+</div>
+
+<script>
+const EQUIPOS = [{"hoja": "Molinos", "desc": "Molino Vertical 1", "modelo": null, "ultimacambio": "2026-04-04", "funcionado": 3190, "detenido": 948, "plan": 3500, "restante": 310, "fechaprox": "2026-10-05", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Molinos", "desc": "Molino Vertical 2", "modelo": null, "ultimacambio": "2026-08-26", "funcionado": 573, "detenido": null, "plan": 3500, "restante": 2927, "fechaprox": "2027-01-22", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Molinos", "desc": "Molino Vertical 3", "modelo": null, "ultimacambio": "2026-05-23", "funcionado": 2860, "detenido": 101, "plan": 3500, "restante": 640, "fechaprox": "2026-10-19", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Molinos", "desc": "Molino Repaso 24", "modelo": null, "ultimacambio": "2024-07-21", "funcionado": 12602, "detenido": null, "plan": 12000, "restante": -602, "fechaprox": "2026-08-28", "estado": "PROGRAMAR", "estadoactual": "OPERANDO"}, {"hoja": "Molinos", "desc": "Molino Repaso 25", "modelo": null, "ultimacambio": "2025-01-26", "funcionado": 10517, "detenido": null, "plan": 12000, "restante": 1483, "fechaprox": "2026-11-23", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Verticales", "desc": "Bba Vertical 1", "modelo": "VMS", "ultimacambio": "2026-09-05", "funcionado": 249, "detenido": 193, "plan": 8760, "restante": 8511, "fechaprox": "2027-09-12", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Verticales", "desc": "Bba Vertical 2", "modelo": "HAZLETON", "ultimacambio": "2026-04-12", "funcionado": 2720, "detenido": 1173, "plan": 8760, "restante": 6040, "fechaprox": "2027-06-01", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Verticales", "desc": "Bba Vertical 3", "modelo": "VMS", "ultimacambio": "2025-11-23", "funcionado": 6331, "detenido": 922, "plan": 8760, "restante": 2429, "fechaprox": "2027-01-02", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Verticales", "desc": "Bba Vertical 4", "modelo": "VMS", "ultimacambio": "2026-04-13", "funcionado": 3420, "detenido": 449, "plan": 8760, "restante": 5340, "fechaprox": "2027-05-03", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Verticales", "desc": "Bba Vertical 5", "modelo": "HAZLETON", "ultimacambio": "2026-07-14", "funcionado": 1370, "detenido": 343, "plan": 8760, "restante": 7390, "fechaprox": "2027-07-27", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Verticales", "desc": "Bba Vertical 6", "modelo": "VMS", "ultimacambio": "2025-11-09", "funcionado": 5681, "detenido": 1908, "plan": 8760, "restante": 3079, "fechaprox": "2027-01-29", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Verticales", "desc": "Bba Vertical 7", "modelo": "VMS", "ultimacambio": "2026-06-27", "funcionado": 1977, "detenido": 144, "plan": 8760, "restante": 6783, "fechaprox": "2027-07-02", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Verticales", "desc": "Bba Vertical 8", "modelo": "VMS", "ultimacambio": "2026-02-17", "funcionado": 4789, "detenido": 401, "plan": 8760, "restante": 3971, "fechaprox": "2027-03-07", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Verticales", "desc": "Bba Vertical 9", "modelo": "VMS", "ultimacambio": "2025-09-04", "funcionado": 6437, "detenido": 2734, "plan": 8760, "restante": 2323, "fechaprox": "2026-12-28", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Verticales", "desc": "Bba Vertical 10", "modelo": "HAZLETON", "ultimacambio": "2026-03-22", "funcionado": 3015, "detenido": 1383, "plan": 8760, "restante": 5745, "fechaprox": "2027-05-20", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Verticales", "desc": "Bba Vertical 11", "modelo": "HAZLETON", "ultimacambio": "2024-09-30", "funcionado": 6621, "detenido": 10659, "plan": 8760, "restante": 2139, "fechaprox": "2026-12-21", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "Bomba B1", "modelo": "14x12", "ultimacambio": "2026-02-01", "funcionado": 5274, "detenido": 352, "plan": 7000, "restante": 1726, "fechaprox": "2026-12-03", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba B2", "modelo": "14x12", "ultimacambio": "2026-04-10", "funcionado": 3800, "detenido": 193, "plan": 7000, "restante": 3200, "fechaprox": "2027-02-03", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba B3", "modelo": "14x12", "ultimacambio": "2026-05-26", "funcionado": 806, "detenido": 2083, "plan": 7000, "restante": 6194, "fechaprox": "2027-06-08", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "Bomba E1", "modelo": "14x12", "ultimacambio": "2025-02-15", "funcionado": 2229, "detenido": 11800, "plan": 7000, "restante": 4771, "fechaprox": "2027-04-09", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba E2", "modelo": "14x12", "ultimacambio": "2025-08-30", "funcionado": 6581, "detenido": 2764, "plan": 7000, "restante": 419, "fechaprox": "2026-10-10", "estado": "PROGRAMAR", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "Bomba E3", "modelo": "14x12", "ultimacambio": "2026-07-12", "funcionado": 676, "detenido": 1085, "plan": 7000, "restante": 6324, "fechaprox": "2027-06-13", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "Bomba L1", "modelo": "10x10", "ultimacambio": "2026-08-02", "funcionado": 1219, "detenido": 38, "plan": 7000, "restante": 5781, "fechaprox": "2027-05-21", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba L2", "modelo": "10x10", "ultimacambio": "2026-05-06", "funcionado": 3258, "detenido": 111, "plan": 7000, "restante": 3742, "fechaprox": "2027-02-25", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba K2", "modelo": "14x12", "ultimacambio": "2025-05-22", "funcionado": 6066, "detenido": 5679, "plan": 7000, "restante": 934, "fechaprox": "2026-10-31", "estado": "PROGRAMAR", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba K3", "modelo": "14x12", "ultimacambio": "2026-01-11", "funcionado": 4317, "detenido": 1813, "plan": 7000, "restante": 2683, "fechaprox": "2027-01-12", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "Bomba J3", "modelo": "14x12", "ultimacambio": "2026-08-30", "funcionado": 243, "detenido": 343, "plan": 7000, "restante": 6757, "fechaprox": "2027-07-01", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "Bomba J4", "modelo": "14x12", "ultimacambio": "2026-04-27", "funcionado": 627, "detenido": 2958, "plan": 7000, "restante": 6373, "fechaprox": "2027-06-15", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba I1", "modelo": "10x10", "ultimacambio": "2025-07-19", "funcionado": 1410, "detenido": 184, "plan": 7000, "restante": 5590, "fechaprox": "2027-05-13", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba I2", "modelo": "10x10", "ultimacambio": "2025-12-26", "funcionado": 3916, "detenido": 2598, "plan": 4953, "restante": 1037, "fechaprox": "2026-11-05", "estado": "PROGRAMAR", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba I3", "modelo": "10x10", "ultimacambio": "2026-08-01", "funcionado": 170, "detenido": 1111, "plan": 7000, "restante": 6830, "fechaprox": "2027-07-04", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "Bomba H1", "modelo": "10x10", "ultimacambio": "2025-11-24", "funcionado": 6472, "detenido": 2137, "plan": 7000, "restante": 528, "fechaprox": "2026-10-15", "estado": "PROGRAMAR", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba H2", "modelo": "10x10", "ultimacambio": "2026-06-12", "funcionado": 1417, "detenido": 1064, "plan": 7000, "restante": 5583, "fechaprox": "2027-05-13", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "Bomba H3", "modelo": "10x10", "ultimacambio": "2025-10-19", "funcionado": 2435, "detenido": 5711, "plan": 7000, "restante": 4565, "fechaprox": "2027-04-01", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba H4", "modelo": "10x10", "ultimacambio": "2025-10-21", "funcionado": 929, "detenido": 7169, "plan": 7000, "restante": 6071, "fechaprox": "2027-06-02", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "Bomba 101", "modelo": "14x12", "ultimacambio": "2025-05-09", "funcionado": 4348, "detenido": 7710, "plan": 7000, "restante": 2652, "fechaprox": "2027-01-11", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "Bomba 102", "modelo": "14x12", "ultimacambio": "2024-11-14", "funcionado": 9585, "detenido": 6693, "plan": 7000, "restante": -2585, "fechaprox": "2026-06-07", "estado": "PROGRAMAR", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba 105", "modelo": "16x14", "ultimacambio": "2026-05-20", "funcionado": 2578, "detenido": 455, "plan": 7000, "restante": 4422, "fechaprox": "2027-03-26", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba 106", "modelo": "16x14", "ultimacambio": "2026-08-04", "funcionado": 1006, "detenido": 203, "plan": 7000, "restante": 5994, "fechaprox": "2027-05-30", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba 411", "modelo": "20x18", "ultimacambio": "2025-11-17", "funcionado": 4836, "detenido": 2614, "plan": 7000, "restante": 2164, "fechaprox": "2026-12-22", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba 412", "modelo": "20x18", "ultimacambio": "2026-06-16", "funcionado": 1166, "detenido": 1219, "plan": 7000, "restante": 5834, "fechaprox": "2027-05-24", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba 413", "modelo": "20x18", "ultimacambio": "2026-05-03", "funcionado": 2101, "detenido": 1341, "plan": 7000, "restante": 4899, "fechaprox": "2027-04-15", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "Bomba 421", "modelo": "10x8", "ultimacambio": "2026-06-01", "funcionado": 2339, "detenido": 406, "plan": 7000, "restante": 4661, "fechaprox": "2027-04-05", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba 422", "modelo": "10x8", "ultimacambio": "2026-01-26", "funcionado": 3775, "detenido": 1995, "plan": 7000, "restante": 3225, "fechaprox": "2027-02-04", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "Bomba 423", "modelo": "10x8", "ultimacambio": "2026-08-20", "funcionado": 180, "detenido": 645, "plan": 7000, "restante": 6820, "fechaprox": "2027-07-04", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA E-441", "modelo": "16x14", "ultimacambio": "2024-12-22", "funcionado": 11768, "detenido": 3602, "plan": 12000, "restante": 232, "fechaprox": "2026-10-02", "estado": "PROGRAMAR", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA E-442", "modelo": "16x14", "ultimacambio": "2025-05-01", "funcionado": 7270, "detenido": 4979, "plan": 12000, "restante": 4730, "fechaprox": "2027-04-08", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA E-443", "modelo": "16x14", "ultimacambio": "2025-05-26", "funcionado": 9059, "detenido": 2590, "plan": 12000, "restante": 2941, "fechaprox": "2027-01-23", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA G-1", "modelo": "14x12", "ultimacambio": "2026-04-25", "funcionado": 1834, "detenido": 990, "plan": 7000, "restante": 5166, "fechaprox": "2027-04-26", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA G-2", "modelo": "14x12", "ultimacambio": "2026-02-26", "funcionado": 1836, "detenido": 3189, "plan": 7000, "restante": 5164, "fechaprox": "2027-04-26", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA G-3", "modelo": "14x12", "ultimacambio": "2026-06-21", "funcionado": 708, "detenido": 462, "plan": 7000, "restante": 6292, "fechaprox": "2027-06-12", "estado": "OK", "estadoactual": "LISTO"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA G-5", "modelo": "14x12", "ultimacambio": "2025-06-21", "funcionado": 2771, "detenido": 8251, "plan": 7000, "restante": 4229, "fechaprox": "2027-03-18", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA G-6", "modelo": "14x12", "ultimacambio": "2025-10-21", "funcionado": 4651, "detenido": 3447, "plan": 7000, "restante": 2349, "fechaprox": "2026-12-29", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA G-7", "modelo": "14x12", "ultimacambio": "2026-06-25", "funcionado": 1442, "detenido": 727, "plan": 7000, "restante": 5558, "fechaprox": "2027-05-12", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA G-8", "modelo": "14x12", "ultimacambio": "2026-06-25", "funcionado": 121, "detenido": 2048, "plan": 7000, "restante": 6879, "fechaprox": "2027-07-06", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA G-9", "modelo": "14x12", "ultimacambio": "2026-05-19", "funcionado": 612, "detenido": 2445, "plan": 7000, "restante": 6388, "fechaprox": "2027-06-16", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA G-10", "modelo": "14x12", "ultimacambio": "2026-09-09", "funcionado": 95, "detenido": 252, "plan": 7000, "restante": 6905, "fechaprox": "2027-07-07", "estado": "OK", "estadoactual": "OPERANDO"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA PISCINA 1", "modelo": "8x8", "ultimacambio": "2025-10-12", "funcionado": 3770, "detenido": 4544, "plan": 7000, "restante": 3230, "fechaprox": "2027-02-04", "estado": "OK", "estadoactual": "DETENIDA"}, {"hoja": "Bombas Horizontales", "desc": "BOMBA PISCINA 2", "modelo": "8x8", "ultimacambio": "2026-03-30", "funcionado": 2619, "detenido": 1639, "plan": 7000, "restante": 4381, "fechaprox": "2027-03-24", "estado": "OK", "estadoactual": "OPERANDO"}];
+const LAST_READING = "2026-09-23";
+
+function fmtDate(iso){
+  if(!iso) return "—";
+  const [y,m,d] = iso.split("-");
+  const meses = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  return `${d} ${meses[parseInt(m,10)-1]} ${y}`;
+}
+function daysUntil(iso){
+  const target = new Date(iso+"T00:00:00");
+  const ref = new Date(LAST_READING+"T00:00:00");
+  return Math.round((target-ref)/86400000);
+}
+function eaClass(e){ return e.estadoactual || "SINDATO"; }
+function eaLabel(e){ return e.estadoactual || "SIN DATO"; }
+
+const HOJAS = ["Bombas Horizontales","Bombas Verticales","Molinos"];
+
+function renderKPIs(){
+  const total = EQUIPOS.length;
+  const operando = EQUIPOS.filter(e=>e.estadoactual==="OPERANDO").length;
+  const detenida = EQUIPOS.filter(e=>e.estadoactual==="DETENIDA").length;
+  const atencion = EQUIPOS.filter(e=>e.estado==="PROGRAMAR" || e.restante<500).length;
+
+  const items = [
+    {cls:"accentline", label:"Equipos monitoreados", value:total, sub:"3 líneas: horizontales, verticales, molinos"},
+    {cls:"goodline", label:"Operando ahora", value:operando, sub:`${Math.round(operando/total*100)}% de la flota`},
+    {cls:"critline", label:"Detenidos ahora", value:detenida, sub:`${Math.round(detenida/total*100)}% de la flota`},
+    {cls:"warnline", label:"Requieren atención", value:atencion, sub:"PROGRAMAR o Restante < 500 h"},
+  ];
+  document.getElementById("kpiStrip").innerHTML = items.map(it=>`
+    <div class="kpi ${it.cls}">
+      <div class="label">${it.label}</div>
+      <div class="value num">${it.value}</div>
+      <div class="sub">${it.sub}</div>
+    </div>`).join("");
+}
+
+function renderPanels(){
+  document.getElementById("panelsCount").textContent = `${EQUIPOS.length} equipos totales`;
+  const html = HOJAS.map(hoja=>{
+    const items = EQUIPOS.filter(e=>e.hoja===hoja);
+    const operando = items.filter(e=>e.estadoactual==="OPERANDO").length;
+    const detenida = items.filter(e=>e.estadoactual==="DETENIDA").length;
+    const pct = Math.round(operando/items.length*100);
+    const maxH = Math.max(...items.map(e=>(e.funcionado||0)+(e.detenido||0)));
+    const rows = items.map(e=>{
+      const func = e.funcionado||0, det = e.detenido||0;
+      const funcPct = maxH? (func/maxH*100) : 0;
+      const detPct = maxH? (det/maxH*100) : 0;
+      return `<div class="row">
+        <div class="name"><b>${e.desc}</b>${e.modelo? ` <span class="model">${e.modelo}</span>`:""}</div>
+        <div class="bar" title="Funcionado ${func} h · Detenido ${det} h">
+          <div class="seg-func" style="width:${funcPct}%"></div>
+          <div class="seg-det" style="width:${detPct}%"></div>
+        </div>
+        <div class="chip ${eaClass(e)}" title="${eaLabel(e)}"></div>
+      </div>`;
+    }).join("");
+    return `<div class="panel">
+      <div class="panel-head">
+        <div class="ring" style="--pct:${pct}"><span>${pct}%</span></div>
+        <div class="panel-title">
+          <h3>${hoja}</h3>
+          <div class="meta">${items.length} equipos</div>
+          <div class="legend-mini">
+            <span><span class="dot" style="background:var(--good)"></span>${operando} operando</span>
+            <span><span class="dot" style="background:var(--critical)"></span>${detenida} detenidos</span>
+          </div>
+        </div>
+      </div>
+      <div class="rows">${rows}</div>
+      <div class="rows-fade"></div>
+    </div>`;
+  }).join("");
+  document.getElementById("panels").innerHTML = html;
+}
+
+function renderAtrasados(){
+  const list = EQUIPOS.filter(e=> e.estado==="PROGRAMAR" || e.restante<500)
+                       .sort((a,b)=>a.restante-b.restante);
+  document.getElementById("atrasadosBody").innerHTML = list.map(e=>{
+    const restCls = e.restante<0 ? "restante-neg" : (e.restante<500 ? "restante-low" : "");
+    return `<tr>
+      <td><b>${e.desc}</b><div class="hoja-tag">${e.hoja}</div></td>
+      <td><span class="status-pill ${e.estado}">${e.estado}</span></td>
+      <td class="num ${restCls}">${e.restante}</td>
+      <td class="num">${fmtDate(e.fechaprox)}</td>
+      <td><span class="status-pill ${eaClass(e)}">${eaLabel(e)}</span></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" style="color:var(--ink-3)">Sin equipos en esta condición.</td></tr>`;
+}
+
+function renderTimeline(){
+  const list = [...EQUIPOS].filter(e=>e.fechaprox)
+                            .sort((a,b)=> a.fechaprox.localeCompare(b.fechaprox))
+                            .slice(0,10);
+  document.getElementById("timelineList").innerHTML = list.map(e=>{
+    const d = daysUntil(e.fechaprox);
+    const rel = d<0 ? `hace ${Math.abs(d)} d` : (d===0? "hoy" : `en ${d} d`);
+    return `<li>
+      <div class="date">${fmtDate(e.fechaprox)}<small>${rel}</small></div>
+      <div class="desc"><b>${e.desc}</b><span class="hoja-tag">${e.hoja}</span></div>
+      <span class="status-pill ${eaClass(e)}">${eaLabel(e)}</span>
+    </li>`;
+  }).join("");
+}
+
+function renderCuadro(filtro){
+  filtro = (filtro||"").trim().toLowerCase();
+  const list = [...EQUIPOS]
+    .filter(e => !filtro || e.desc.toLowerCase().includes(filtro) || (e.modelo||"").toLowerCase().includes(filtro) || e.hoja.toLowerCase().includes(filtro))
+    .sort((a,b)=> a.hoja.localeCompare(b.hoja) || a.desc.localeCompare(b.desc, undefined, {numeric:true}));
+  document.getElementById("cuadroCount").textContent = `${list.length} de ${EQUIPOS.length} equipos`;
+  document.getElementById("cuadroBody").innerHTML = list.map(e => `
+    <tr>
+      <td><span class="hoja-tag">${e.hoja}</span></td>
+      <td><b>${e.desc}</b></td>
+      <td class="num">${e.modelo || "—"}</td>
+      <td class="num">${fmtDate(e.ultimacambio)}</td>
+      <td class="num">${(e.funcionado||0).toLocaleString("es-CL")}</td>
+      <td><span class="status-pill ${e.estado}">${e.estado}</span></td>
+      <td><span class="status-pill ${eaClass(e)}">${eaLabel(e)}</span></td>
+    </tr>`).join("") || `<tr><td colspan="7" style="color:var(--ink-3)">Sin resultados para ese filtro.</td></tr>`;
+}
+
+document.getElementById("lastReadOut").textContent = fmtDate(LAST_READING) + " · 10:26";
+renderKPIs();
+renderPanels();
+renderAtrasados();
+renderTimeline();
+renderCuadro("");
+
+/* ---------- Alerta PROGRAMAR ---------- */
+const LINEAS = [
+  {key:"Bombas Horizontales", label:"Bombas Horizontales"},
+  {key:"Bombas Verticales",  label:"Casa de Bomba"},
+  {key:"Molinos",            label:"Molinos"},
+];
+const lineaLabel = h => (LINEAS.find(l=>l.key===h)||{label:h}).label;
+const esc = s => String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const rowId = e => "eq-" + e.desc.replace(/[^A-Za-z0-9]+/g,"-");
+
+function renderAlerta(){
+  const prog = EQUIPOS.filter(e=>e.estado==="PROGRAMAR").sort((a,b)=>a.restante-b.restante);
+  document.getElementById("tabBadge").textContent = prog.length;
+  const box = document.getElementById("alertaProgramar");
+  if(!prog.length){ box.hidden = true; return; }
+  box.innerHTML = `
+    <div class="alerta-head">
+      <h2><span class="icon">!</span>${prog.length} equipos en PROGRAMAR</h2>
+      <p>Hay que definir cuándo ejecutar el cambio. Toca un equipo para verlo en la planilla.</p>
+    </div>
+    <div class="alerta-list">${prog.map(e=>{
+      const d = daysUntil(e.fechaprox);
+      const cuando = d<0 ? `<span class="vencido">vencido hace ${Math.abs(d)} d</span>` : `en ${d} d`;
+      const rest = e.restante<0 ? `<span class="vencido">${e.restante.toLocaleString("es-CL")} h</span>` : `${e.restante.toLocaleString("es-CL")} h`;
+      return `<button class="alerta-item" data-goto="${esc(e.desc)}">
+        <div class="top"><b>${esc(e.desc)}</b><span class="status-pill ${eaClass(e)}">${eaLabel(e)}</span></div>
+        <span class="linea">${lineaLabel(e.hoja)}</span>
+        <span class="nums">Restante ${rest}</span><span class="nums">Próx. cambio ${fmtDate(e.fechaprox)} · ${cuando}</span>
+      </button>`;}).join("")}
+    </div>`;
+  box.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click", ()=>{
+    const e = EQUIPOS.find(x=>x.desc===b.dataset.goto);
+    irAPlanilla(e);
+  }));
+}
+
+/* ---------- Pestañas ---------- */
+function setTab(name){
+  document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected", t.dataset.tab===name));
+  document.getElementById("tab-resumen").hidden = name!=="resumen";
+  document.getElementById("tab-planilla").hidden = name!=="planilla";
+  try{ localStorage.setItem("hor_tab", name); }catch(_){}
+}
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click", ()=>setTab(t.dataset.tab)));
+
+/* ---------- Planilla ---------- */
+let filtroLinea = "TODAS";
+let soloProg = false;
+function fmtCorta(iso){ if(!iso) return "—"; const [y,m,d]=iso.split("-"); return `${d}/${m}/${y}`; }
+
+function renderFiltros(){
+  const opts = [{key:"TODAS", label:"Todas"}, ...LINEAS];
+  const html = opts.map(o=>{
+    const n = o.key==="TODAS" ? EQUIPOS.length : EQUIPOS.filter(e=>e.hoja===o.key).length;
+    return `<button class="filtro" data-f="${o.key}" aria-pressed="${filtroLinea===o.key}">${o.label}<span class="n">${n}</span></button>`;
+  }).join("") + `<label class="solo-prog"><input type="checkbox" id="soloProg" ${soloProg?"checked":""}> Solo PROGRAMAR</label>`;
+  const f = document.getElementById("filtros");
+  f.innerHTML = html;
+  f.querySelectorAll("[data-f]").forEach(b=>b.addEventListener("click", ()=>{ filtroLinea=b.dataset.f; renderFiltros(); renderPlanilla(); }));
+  document.getElementById("soloProg").addEventListener("change", ev=>{ soloProg=ev.target.checked; renderPlanilla(); });
+}
+
+function renderPlanilla(){
+  const lineas = filtroLinea==="TODAS" ? LINEAS : LINEAS.filter(l=>l.key===filtroLinea);
+  let html = "";
+  lineas.forEach(l=>{
+    const items = EQUIPOS.filter(e=>e.hoja===l.key && (!soloProg || e.estado==="PROGRAMAR"));
+    if(!items.length) return;
+    if(filtroLinea==="TODAS") html += `<tr class="grp-row"><td colspan="12">${l.label}</td></tr>`;
+    html += items.map(e=>{
+      const restCls = e.restante<0 ? "rest-neg" : (e.restante<500 ? "rest-low" : "");
+      const mes = e.fechaprox ? parseInt(e.fechaprox.split("-")[1],10) : "—";
+      return `<tr id="${rowId(e)}" class="${e.estado==="PROGRAMAR"?"prog":""}">
+        <td class="desc">${esc(e.desc)}</td>
+        <td>${esc(e.modelo||"—")}</td>
+        <td>${fmtCorta(e.ultimacambio)}</td>
+        <td>${fmtCorta(LAST_READING)}</td>
+        <td>${(e.funcionado??0).toLocaleString("es-CL")}</td>
+        <td>${(e.detenido??0).toLocaleString("es-CL")}</td>
+        <td>${(e.plan??0).toLocaleString("es-CL")}</td>
+        <td class="${restCls}">${(e.restante??0).toLocaleString("es-CL")}</td>
+        <td>${fmtCorta(e.fechaprox)}</td>
+        <td>${mes}</td>
+        <td><span class="status-pill ${e.estado}">${e.estado}</span></td>
+        <td><span class="status-pill ${eaClass(e)}">${eaLabel(e)}</span></td>
+      </tr>`;
+    }).join("");
+  });
+  document.getElementById("planillaBody").innerHTML = html || `<tr><td colspan="12" style="color:var(--ink-3)">Sin equipos para este filtro.</td></tr>`;
+}
+
+function irAPlanilla(e){
+  filtroLinea = e.hoja; soloProg = false;
+  renderFiltros(); renderPlanilla(); setTab("planilla");
+  const tr = document.getElementById(rowId(e));
+  if(tr){ tr.scrollIntoView({behavior:"smooth", block:"center"}); tr.classList.remove("flash"); void tr.offsetWidth; tr.classList.add("flash"); }
+}
+
+renderAlerta();
+renderFiltros();
+renderPlanilla();
+try{ const t = localStorage.getItem("hor_tab"); if(t==="planilla") setTab("planilla"); }catch(_){}
+document.getElementById("cuadroFiltro").addEventListener("input", (e)=> renderCuadro(e.target.value));
+</script>
+</body>
+</html>
