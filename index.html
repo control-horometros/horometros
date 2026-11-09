@@ -124,6 +124,16 @@
     font-family:var(--font-mono); font-size:12px; color:var(--ink-3); text-align:right;
   }
   .updated b{color:var(--ink-2); font-weight:600;}
+  .btn-xlsx{
+    margin-top:10px; display:inline-flex; align-items:center; gap:6px;
+    font-family:var(--font-body); font-size:13px; font-weight:600;
+    color:var(--accent-ink); background:var(--accent); border:0; border-radius:8px;
+    padding:8px 14px; cursor:pointer; box-shadow:var(--shadow);
+  }
+  .btn-xlsx:hover{filter:brightness(1.06);}
+  .btn-xlsx:disabled{opacity:.65; cursor:progress;}
+  .btn-xlsx:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+  .btn-xlsx-msg{display:block; min-height:1em; margin-top:4px; font-size:11px; color:var(--ink-3);}
 
   /* ---------- KPI strip ---------- */
   .kpis{
@@ -312,6 +322,8 @@
     </div>
     <div class="updated">
       Última lectura registrada<br><b id="lastReadOut">—</b>
+      <br><button class="btn-xlsx" id="btnExcel" type="button" title="Descarga un Excel con colores y una pestaña por línea">⬇ Descargar Excel</button>
+      <span class="btn-xlsx-msg" id="btnExcelMsg" aria-live="polite"></span>
     </div>
   </div>
 
@@ -416,6 +428,154 @@
 
 </div>
 
+<script>
+/* Reporte Excel "Sala de Control Horómetros" — usa ExcelJS. Misma función en la página y en el archivo semanal. */
+function buildReporteHorometros(ExcelJS, EQ, lastReading, hora){
+  const C = {ink:"FF36424A", head:"FF36424A", headTxt:"FFFFFFFF", accent:"FFE55302", band:"FFF6F4EF",
+    ok:"FF2E8B57", det:"FFC13832", listo:"FFF4AA00", prog:"FFC13832", okWash:"FFDDF1E4",
+    warnWash:"FFFFF1C7", critWash:"FFF8DCDA", border:"FFC9CED1", white:"FFFFFFFF", grey:"FF5C6971"};
+  const LINEAS = [
+    {key:"Bombas Horizontales", label:"Bombas Horizontales"},
+    {key:"Bombas Verticales", label:"Casa de Bomba"},
+    {key:"Molinos", label:"Molinos"}];
+  const lab = h => (LINEAS.find(l=>l.key===h)||{label:h}).label;
+  const toDate = iso => { if(!iso) return null; const [y,m,d]=iso.split("-").map(Number); return new Date(Date.UTC(y,m-1,d)); };
+  const [ly,lm,ld] = lastReading.split("-");
+  const lectura = `${ld}/${lm}/${ly}${hora? " "+hora : ""}`;
+  const refDate = toDate(lastReading);
+  const dias = iso => iso ? Math.round((toDate(iso)-refDate)/86400000) : null;
+  const ea = e => e.estadoactual || "SIN DATO";
+  const fill = argb => ({type:"pattern", pattern:"solid", fgColor:{argb}});
+  const thin = {style:"thin", color:{argb:C.border}};
+  const box = {top:thin,left:thin,bottom:thin,right:thin};
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Sala de Control Horómetros"; wb.created = new Date();
+
+  function titulo(ws, texto, sub, ncols){
+    ws.mergeCells(1,1,1,ncols); ws.mergeCells(2,1,2,ncols);
+    const t = ws.getCell(1,1); t.value = texto;
+    t.font = {bold:true, size:16, color:{argb:C.headTxt}}; t.fill = fill(C.head);
+    t.alignment = {vertical:"middle", horizontal:"left", indent:1};
+    ws.getRow(1).height = 30;
+    const s = ws.getCell(2,1); s.value = sub;
+    s.font = {italic:true, size:10, color:{argb:C.grey}}; s.alignment = {indent:1};
+    for(let c=1;c<=ncols;c++){ ws.getCell(1,c).fill = fill(C.head); ws.getCell(3,c).border = {top:{style:"medium",color:{argb:C.accent}}}; }
+  }
+  function header(row, cols){
+    cols.forEach((h,i)=>{ const c=row.getCell(i+1); c.value=h; c.font={bold:true,color:{argb:C.headTxt}};
+      c.fill=fill(C.head); c.alignment={horizontal:"center",vertical:"middle",wrapText:true}; c.border=box; });
+    row.height = 30;
+  }
+  function pintarEA(cell, v){
+    cell.value = v;
+    const col = v==="OPERANDO"?C.ok : v==="LISTO"?C.listo : v==="SIN DATO"?C.grey : C.det;
+    cell.fill = fill(col); cell.font = {bold:true, color:{argb: v==="LISTO"?"FF3A2A00":C.white}};
+    cell.alignment = {horizontal:"center"};
+  }
+  function pintarEstado(cell, v){
+    cell.value = v;
+    if(v==="PROGRAMAR"){ cell.fill = fill(C.prog); cell.font = {bold:true,color:{argb:C.white}}; }
+    else { cell.fill = fill(C.okWash); cell.font = {bold:true,color:{argb:"FF1E6B3F"}}; }
+    cell.alignment = {horizontal:"center"};
+  }
+  function pintarRestante(cell, r){
+    cell.value = r; cell.numFmt = "#,##0;[Red]-#,##0";
+    if(r<0){ cell.fill = fill(C.critWash); cell.font = {bold:true,color:{argb:C.det}}; }
+    else if(r<500){ cell.fill = fill(C.warnWash); cell.font = {bold:true,color:{argb:"FF9C6A00"}}; }
+  }
+
+  /* ---------- Resumen ---------- */
+  const R = wb.addWorksheet("Resumen", {views:[{showGridLines:false}], properties:{tabColor:{argb:C.accent}}});
+  R.columns = [{width:24},{width:22},{width:14},{width:14},{width:18},{width:16},{width:16}];
+  titulo(R, "Sala de Control Horómetros — Planta de Flotación", `Lectura: ${lectura}  ·  Bombas horizontales, casa de bomba y molinos`, 7);
+
+  const tot = EQ.length, op = EQ.filter(e=>ea(e)==="OPERANDO").length, li = EQ.filter(e=>ea(e)==="LISTO").length;
+  const de = EQ.filter(e=>ea(e)==="DETENIDA").length;
+  const prog = EQ.filter(e=>e.estado==="PROGRAMAR");
+  const bajo = EQ.filter(e=>e.estado!=="PROGRAMAR" && e.restante<500);
+  const kpis = [["Equipos",tot,C.ink],["Operando",op,C.ok],["Detenidos",de,C.det],["Listos",li,C.listo],["En PROGRAMAR",prog.length,C.prog],["< 500 h restantes",bajo.length,"FF9C6A00"]];
+  let r = 4;
+  kpis.forEach((k,i)=>{ const c = R.getCell(r, i+1); c.value = k[0]; c.font={size:9,bold:true,color:{argb:C.grey}};
+    c.alignment={horizontal:"center"}; c.fill=fill(C.band); c.border=box;
+    const v = R.getCell(r+1, i+1); v.value = k[1]; v.font={size:20,bold:true,color:{argb:k[2]}};
+    v.alignment={horizontal:"center",vertical:"middle"}; v.fill=fill(C.band); v.border=box; });
+  R.getRow(r+1).height = 34;
+
+  r = 8;
+  R.getCell(r,1).value = "Estado por línea"; R.getCell(r,1).font = {bold:true,size:12,color:{argb:C.ink}};
+  header(R.getRow(r+1), ["Línea","Equipos","Operando","Detenidos","Listos","PROGRAMAR","< 500 h"]);
+  r += 2;
+  LINEAS.forEach(L=>{
+    const g = EQ.filter(e=>e.hoja===L.key);
+    const vals = [L.label, g.length, g.filter(e=>ea(e)==="OPERANDO").length, g.filter(e=>ea(e)==="DETENIDA").length,
+      g.filter(e=>ea(e)==="LISTO").length, g.filter(e=>e.estado==="PROGRAMAR").length, g.filter(e=>e.estado!=="PROGRAMAR"&&e.restante<500).length];
+    vals.forEach((v,i)=>{ const c=R.getCell(r,i+1); c.value=v; c.border=box; c.alignment={horizontal:i?"center":"left"};
+      if(i===5 && v>0){ c.font={bold:true,color:{argb:C.det}}; } });
+    r++;
+  });
+
+  r += 1;
+  R.getCell(r,1).value = "Alerta: equipos en PROGRAMAR o con menos de 500 h";
+  R.getCell(r,1).font = {bold:true,size:12,color:{argb:C.det}};
+  header(R.getRow(r+1), ["Equipo","Línea","Restante (h)","Estado","Estado actual","Próx. cambio","Días al cambio"]);
+  r += 2;
+  [...prog, ...bajo].sort((a,b)=>a.restante-b.restante).forEach((e,i)=>{
+    const row = R.getRow(r);
+    row.getCell(1).value = e.desc; row.getCell(1).font = {bold:true};
+    row.getCell(2).value = lab(e.hoja);
+    pintarRestante(row.getCell(3), e.restante);
+    pintarEstado(row.getCell(4), e.estado);
+    pintarEA(row.getCell(5), ea(e));
+    const f = row.getCell(6); f.value = toDate(e.fechaprox); f.numFmt = "dd/mm/yyyy"; f.alignment={horizontal:"center"};
+    const d = dias(e.fechaprox); const dc = row.getCell(7); dc.value = d; dc.alignment={horizontal:"center"};
+    if(d!==null && d<0){ dc.font={bold:true,color:{argb:C.det}}; }
+    for(let c=1;c<=7;c++) row.getCell(c).border = box;
+    r++;
+  });
+  r += 1;
+  const nota = R.getCell(r,1);
+  nota.value = "Leyenda: Restante en rojo = plan vencido; fondo amarillo = menos de 500 h. Días al cambio negativos = fecha de cambio ya pasada.";
+  nota.font = {italic:true,size:9,color:{argb:C.grey}}; R.mergeCells(r,1,r,7);
+
+  /* ---------- Hojas por línea ---------- */
+  const COLS = ["Descripción","Modelo","Última cambio","Actual (*)","Funcionado (h)","Detenido (h)","Plan (h)","Restante (h)","Fecha próx. cambio","Mes de cambio","Estado","Estado actual"];
+  const WID  = [24,12,14,13,14,13,11,13,16,10,14,15];
+  LINEAS.forEach(L=>{
+    const g = EQ.filter(e=>e.hoja===L.key);
+    const nprog = g.filter(e=>e.estado==="PROGRAMAR").length;
+    const ws = wb.addWorksheet(L.label, {views:[{state:"frozen", ySplit:4, xSplit:1, showGridLines:false}],
+      properties:{tabColor:{argb: nprog? C.prog : C.ok}}});
+    ws.columns = WID.map(w=>({width:w}));
+    titulo(ws, `${L.label} — Horómetros`, `Lectura: ${lectura}  ·  ${g.length} equipos  ·  ${nprog} en PROGRAMAR`, COLS.length);
+    header(ws.getRow(4), COLS);
+    g.forEach((e,i)=>{
+      const row = ws.getRow(5+i);
+      const fp = toDate(e.fechaprox);
+      const vals = [e.desc, e.modelo||"", toDate(e.ultimacambio), toDate(lastReading), e.funcionado, e.detenido ?? 0, e.plan];
+      vals.forEach((v,j)=>{ const c=row.getCell(j+1); c.value=v; });
+      [3,4].forEach(j=>{ row.getCell(j).numFmt="dd/mm/yyyy"; row.getCell(j).alignment={horizontal:"center"}; });
+      [5,6,7].forEach(j=> row.getCell(j).numFmt="#,##0");
+      row.getCell(1).font = {bold:true};
+      row.getCell(2).alignment = {horizontal:"center"};
+      pintarRestante(row.getCell(8), e.restante);
+      const f = row.getCell(9); f.value = fp; f.numFmt = "dd/mm/yyyy"; f.alignment={horizontal:"center"};
+      const m = row.getCell(10); m.value = fp ? fp.getUTCMonth()+1 : null; m.alignment={horizontal:"center"};
+      pintarEstado(row.getCell(11), e.estado);
+      pintarEA(row.getCell(12), ea(e));
+      for(let c=1;c<=COLS.length;c++){ const cell=row.getCell(c); cell.border = box;
+        if(i%2 && !cell.fill && c<=10) cell.fill = fill(C.band); }
+    });
+    ws.autoFilter = {from:{row:4,column:1}, to:{row:4+g.length, column:COLS.length}};
+    const nr = 6+g.length;
+    ws.getCell(nr,1).value = "(*) Actual = fecha de la lectura. Restante = Plan − Funcionado.";
+    ws.getCell(nr,1).font = {italic:true,size:9,color:{argb:C.grey}};
+    ws.pageSetup = {orientation:"landscape", fitToPage:true, fitToWidth:1, fitToHeight:0, paperSize:9};
+  });
+  R.pageSetup = {orientation:"landscape", fitToPage:true, fitToWidth:1, fitToHeight:0, paperSize:9};
+  return wb;
+}
+</script>
 <script>
 const EQUIPOS = [{"hoja":"Molinos","desc":"Molino Vertical 1","modelo":null,"ultimacambio":"2026-11-02","funcionado":172,"detenido":10,"plan":3500,"restante":3328,"fechaprox":"2027-03-27","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Molinos","desc":"Molino Vertical 2","modelo":null,"ultimacambio":"2026-08-26","funcionado":1704,"detenido":null,"plan":3500,"restante":1796,"fechaprox":"2027-01-22","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Molinos","desc":"Molino Vertical 3","modelo":null,"ultimacambio":"2026-05-23","funcionado":3990,"detenido":102,"plan":3500,"restante":-490,"fechaprox":"2026-10-19","estado":"PROGRAMAR","estadoactual":"OPERANDO"},{"hoja":"Molinos","desc":"Molino Repaso 24","modelo":null,"ultimacambio":"2026-10-02","funcionado":494,"detenido":null,"plan":12000,"restante":11506,"fechaprox":"2028-03-02","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Molinos","desc":"Molino Repaso 25","modelo":null,"ultimacambio":"2025-01-26","funcionado":11414,"detenido":null,"plan":12000,"restante":586,"fechaprox":"2026-12-03","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Verticales","desc":"Bba Vertical 1","modelo":"VMS","ultimacambio":"2026-09-05","funcionado":939,"detenido":634,"plan":8760,"restante":7821,"fechaprox":"2027-09-30","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Verticales","desc":"Bba Vertical 2","modelo":"HAZLETON","ultimacambio":"2026-04-12","funcionado":3394,"detenido":1631,"plan":8760,"restante":5366,"fechaprox":"2027-06-20","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Verticales","desc":"Bba Vertical 3","modelo":"VMS","ultimacambio":"2025-11-23","funcionado":7341,"detenido":1045,"plan":8760,"restante":1419,"fechaprox":"2027-01-07","estado":"PROGRAMAR","estadoactual":"DETENIDA"},{"hoja":"Bombas Verticales","desc":"Bba Vertical 4","modelo":"VMS","ultimacambio":"2026-04-13","funcionado":4495,"detenido":506,"plan":8760,"restante":4265,"fechaprox":"2027-05-05","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Verticales","desc":"Bba Vertical 5","modelo":"HAZLETON","ultimacambio":"2026-10-09","funcionado":626,"detenido":132,"plan":8760,"restante":8134,"fechaprox":"2027-10-13","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Verticales","desc":"Bba Vertical 6","modelo":"VMS","ultimacambio":"2025-11-09","funcionado":6649,"detenido":2072,"plan":8760,"restante":2111,"fechaprox":"2027-02-04","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Verticales","desc":"Bba Vertical 7","modelo":"VMS","ultimacambio":"2026-06-27","funcionado":3035,"detenido":217,"plan":8760,"restante":5725,"fechaprox":"2027-07-05","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Verticales","desc":"Bba Vertical 8","modelo":"VMS","ultimacambio":"2026-02-17","funcionado":5899,"detenido":422,"plan":8760,"restante":2861,"fechaprox":"2027-03-08","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Verticales","desc":"Bba Vertical 9","modelo":"HAZLETON","ultimacambio":"2026-10-31","funcionado":225,"detenido":4,"plan":8760,"restante":8535,"fechaprox":"2027-10-30","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Verticales","desc":"Bba Vertical 10","modelo":"VMS","ultimacambio":"2026-10-31","funcionado":141,"detenido":89,"plan":8760,"restante":8619,"fechaprox":"2027-11-03","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Verticales","desc":"Bba Vertical 11","modelo":"HAZLETON","ultimacambio":"2024-09-30","funcionado":7083,"detenido":11329,"plan":8760,"restante":1677,"fechaprox":"2027-01-17","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba B1","modelo":"14x12","ultimacambio":"2026-10-22","funcionado":9,"detenido":437,"plan":7000,"restante":6991,"fechaprox":"2027-08-27","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba B2","modelo":"14x12","ultimacambio":"2026-04-10","funcionado":4467,"detenido":657,"plan":7000,"restante":2533,"fechaprox":"2027-02-22","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba B3","modelo":"14x12","ultimacambio":"2026-05-26","funcionado":1893,"detenido":2128,"plan":7000,"restante":5107,"fechaprox":"2027-06-09","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba E1","modelo":"14x12","ultimacambio":"2025-02-15","funcionado":2775,"detenido":12384,"plan":7000,"restante":4225,"fechaprox":"2027-05-04","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba E2","modelo":"14x12","ultimacambio":"2026-09-23","funcionado":598,"detenido":544,"plan":7000,"restante":6402,"fechaprox":"2027-08-02","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba E3","modelo":"14x12","ultimacambio":"2026-07-12","funcionado":1124,"detenido":1768,"plan":7000,"restante":5876,"fechaprox":"2027-07-11","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba L1","modelo":"10x10","ultimacambio":"2026-08-02","funcionado":2348,"detenido":41,"plan":7000,"restante":4652,"fechaprox":"2027-05-21","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba L2","modelo":"10x10","ultimacambio":"2026-05-06","funcionado":4389,"detenido":111,"plan":7000,"restante":2611,"fechaprox":"2027-02-25","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba K2","modelo":"14x12","ultimacambio":"2025-05-22","funcionado":6462,"detenido":6414,"plan":7000,"restante":538,"fechaprox":"2026-12-01","estado":"PROGRAMAR","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba K3","modelo":"14x12","ultimacambio":"2026-01-11","funcionado":5097,"detenido":2165,"plan":7000,"restante":1903,"fechaprox":"2027-01-27","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba J3","modelo":"14x12","ultimacambio":"2026-08-30","funcionado":519,"detenido":1198,"plan":7000,"restante":6481,"fechaprox":"2027-08-06","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba J4","modelo":"14x12","ultimacambio":"2026-04-27","funcionado":1481,"detenido":3236,"plan":7000,"restante":5519,"fechaprox":"2027-06-26","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba I1","modelo":"10x10","ultimacambio":"2026-07-19","funcionado":2500,"detenido":224,"plan":7000,"restante":4500,"fechaprox":"2027-05-15","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba I2","modelo":"10x10","ultimacambio":"2026-09-07","funcionado":1515,"detenido":11,"plan":7000,"restante":5485,"fechaprox":"2027-06-25","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba I3","modelo":"10x10","ultimacambio":"2026-08-01","funcionado":371,"detenido":2042,"plan":7000,"restante":6629,"fechaprox":"2027-08-12","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba H1","modelo":"10x10","ultimacambio":"2026-10-13","funcionado":662,"detenido":198,"plan":7000,"restante":6338,"fechaprox":"2027-07-31","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba H2","modelo":"10x10","ultimacambio":"2026-10-31","funcionado":108,"detenido":122,"plan":7000,"restante":6892,"fechaprox":"2027-08-23","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba H3","modelo":"10x10","ultimacambio":"2026-10-26","funcionado":254,"detenido":96,"plan":7000,"restante":6746,"fechaprox":"2027-08-17","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba H4","modelo":"10x10","ultimacambio":"2025-10-21","funcionado":1005,"detenido":8225,"plan":7000,"restante":5995,"fechaprox":"2027-07-16","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba 101","modelo":"14x12","ultimacambio":"2025-05-09","funcionado":4579,"detenido":8610,"plan":7000,"restante":2421,"fechaprox":"2027-02-17","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba 102","modelo":"14x12","ultimacambio":"2024-11-14","funcionado":10475,"detenido":6935,"plan":7000,"restante":-3475,"fechaprox":"2026-06-17","estado":"PROGRAMAR","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba 105","modelo":"16x14","ultimacambio":"2026-05-20","funcionado":3606,"detenido":559,"plan":7000,"restante":3394,"fechaprox":"2027-03-30","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba 106","modelo":"16x14","ultimacambio":"2026-08-04","funcionado":2125,"detenido":216,"plan":7000,"restante":4875,"fechaprox":"2027-05-31","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba 411","modelo":"20x18","ultimacambio":"2026-10-19","funcionado":400,"detenido":118,"plan":7000,"restante":6600,"fechaprox":"2027-08-11","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba 412","modelo":"20x18","ultimacambio":"2026-06-16","funcionado":2072,"detenido":1444,"plan":7000,"restante":4928,"fechaprox":"2027-06-02","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"Bomba 413","modelo":"20x18","ultimacambio":"2026-10-01","funcionado":603,"detenido":347,"plan":7000,"restante":6397,"fechaprox":"2027-08-02","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba 421","modelo":"10x8","ultimacambio":"2026-06-01","funcionado":3336,"detenido":541,"plan":7000,"restante":3664,"fechaprox":"2027-04-10","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba 422","modelo":"10x8","ultimacambio":"2026-01-26","funcionado":4782,"detenido":2119,"plan":7000,"restante":2218,"fechaprox":"2027-02-09","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"Bomba 423","modelo":"10x8","ultimacambio":"2026-08-20","funcionado":842,"detenido":1114,"plan":7000,"restante":6158,"fechaprox":"2027-07-23","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"BOMBA E-441","modelo":"16x14","ultimacambio":"2024-12-22","funcionado":12764,"detenido":3737,"plan":12000,"restante":-764,"fechaprox":"2026-10-08","estado":"PROGRAMAR","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"BOMBA E-442","modelo":"16x14","ultimacambio":"2025-05-01","funcionado":8278,"detenido":5103,"plan":12000,"restante":3722,"fechaprox":"2027-04-13","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"BOMBA E-443","modelo":"16x14","ultimacambio":"2025-05-26","funcionado":9929,"detenido":2852,"plan":12000,"restante":2071,"fechaprox":"2027-02-03","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"BOMBA G-1","modelo":"14x12","ultimacambio":"2026-04-25","funcionado":2120,"detenido":1399,"plan":7000,"restante":4880,"fechaprox":"2027-05-31","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"BOMBA G-2","modelo":"14x12","ultimacambio":"2026-02-26","funcionado":2851,"detenido":3306,"plan":7000,"restante":4149,"fechaprox":"2027-04-30","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"BOMBA G-3","modelo":"14x12","ultimacambio":"2026-06-21","funcionado":941,"detenido":847,"plan":7000,"restante":6059,"fechaprox":"2027-07-19","estado":"OK","estadoactual":"LISTO"},{"hoja":"Bombas Horizontales","desc":"BOMBA G-5","modelo":"14x12","ultimacambio":"2025-06-21","funcionado":2892,"detenido":9261,"plan":7000,"restante":4108,"fechaprox":"2027-04-29","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"BOMBA G-6","modelo":"14x12","ultimacambio":"2025-10-21","funcionado":5204,"detenido":4026,"plan":7000,"restante":1796,"fechaprox":"2027-01-22","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"BOMBA G-7","modelo":"14x12","ultimacambio":"2026-06-25","funcionado":2563,"detenido":737,"plan":7000,"restante":4437,"fechaprox":"2027-05-12","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"BOMBA G-8","modelo":"14x12","ultimacambio":"2026-06-25","funcionado":131,"detenido":3170,"plan":7000,"restante":6869,"fechaprox":"2027-08-22","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"BOMBA G-9","modelo":"14x12","ultimacambio":"2026-05-19","funcionado":612,"detenido":3576,"plan":7000,"restante":6388,"fechaprox":"2027-08-02","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"BOMBA G-10","modelo":"14x12","ultimacambio":"2026-09-09","funcionado":1222,"detenido":256,"plan":7000,"restante":5778,"fechaprox":"2027-07-07","estado":"OK","estadoactual":"OPERANDO"},{"hoja":"Bombas Horizontales","desc":"BOMBA PISCINA 1","modelo":"8x8","ultimacambio":"2026-10-18","funcionado":185,"detenido":357,"plan":7000,"restante":6815,"fechaprox":"2027-08-19","estado":"OK","estadoactual":"DETENIDA"},{"hoja":"Bombas Horizontales","desc":"BOMBA PISCINA 2","modelo":"8x8","ultimacambio":"2026-03-30","funcionado":3479,"detenido":1911,"plan":7000,"restante":3521,"fechaprox":"2027-04-04","estado":"OK","estadoactual":"OPERANDO"}];
 const LAST_READING = "2026-11-09";
@@ -654,6 +814,54 @@ renderFiltros();
 renderPlanilla();
 try{ const t = localStorage.getItem("hor_tab"); if(t==="planilla") setTab("planilla"); }catch(_){}
 document.getElementById("cuadroFiltro").addEventListener("input", (e)=> renderCuadro(e.target.value));
+/* ---------- Botón Descargar Excel ---------- */
+(function(){
+  const btn = document.getElementById("btnExcel");
+  const msg = document.getElementById("btnExcelMsg");
+  const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  let downloadsP = null;
+  if (window.claude && typeof window.claude.use === "function") {
+    downloadsP = window.claude.use("downloads").catch(()=>null);
+  }
+  function cargarExcelJS(){
+    if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+    return new Promise((ok, err)=>{
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+      s.onload = ()=> window.ExcelJS ? ok(window.ExcelJS) : err(new Error("ExcelJS no disponible"));
+      s.onerror = ()=> err(new Error("No se pudo cargar ExcelJS"));
+      document.head.appendChild(s);
+    });
+  }
+  function aviso(t){ msg.textContent = t; if (t) setTimeout(()=>{ if (msg.textContent===t) msg.textContent=""; }, 6000); }
+  btn.addEventListener("click", async ()=>{
+    const original = btn.textContent;
+    btn.disabled = true; btn.textContent = "Generando…"; aviso("");
+    try {
+      const X = await cargarExcelJS();
+      const hora = (document.getElementById("lastReadOut").textContent.split("·")[1] || "").trim();
+      const wb = buildReporteHorometros(X, EQUIPOS, LAST_READING, hora);
+      const buf = await wb.xlsx.writeBuffer();
+      const nombre = `Reporte_Horometros_${LAST_READING}.xlsx`;
+      const blob = new Blob([buf], {type: XLSX_MIME});
+      const dl = downloadsP ? await downloadsP : null;
+      if (dl) {
+        try { await dl.save({filename: nombre, data: blob}); aviso("Excel descargado."); }
+        catch (e) { aviso(e && e.code === "declined" ? "Descarga cancelada." : "No se pudo descargar aquí."); }
+      } else {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = nombre;
+        document.body.appendChild(a); a.click();
+        setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+        aviso("Excel descargado.");
+      }
+    } catch (e) {
+      aviso("No se pudo generar el Excel. Revisa tu conexión e intenta de nuevo.");
+    } finally {
+      btn.disabled = false; btn.textContent = original;
+    }
+  });
+})();
 </script>
 </body>
 </html>
